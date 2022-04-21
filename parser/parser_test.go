@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestIdentifierExpression(t *testing.T) {
-	input := "foobar"
+func TestIntregerLiteralExpression(t *testing.T) {
+	input := "5"
 
 	l := lexer.New(input)
 	p := New(l)
@@ -21,15 +21,16 @@ func TestIdentifierExpression(t *testing.T) {
 	if !ok {
 		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T", program.Statements[0])
 	}
-	ident, ok := stmt.Expression.(*ast.Identifier)
+
+	literal, ok := stmt.Expression.(*ast.IntegerLiteral)
 	if !ok {
 		t.Fatalf("exp not ast.Identifier. got=%T", program.Statements[0])
 	}
-	if ident.Value != "foobar" {
-		t.Fatalf("ident.Value is not %s. got=%s", "foobar", ident.Value)
+	if literal.Value != 5 {
+		t.Fatalf("ident.Value is not %s. got=%d", "5", literal.Value)
 	}
-	if ident.TokenLiteral() != "foobar" {
-		t.Errorf("ident.TokenLiteral nbot %s. got %s", "foobar", ident.TokenLiteral())
+	if literal.TokenLiteral() != "5" {
+		t.Errorf("ident.TokenLiteral not %s. got %s", "5", literal.TokenLiteral())
 	}
 }
 
