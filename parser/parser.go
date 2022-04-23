@@ -14,8 +14,8 @@ const (
 	LOWEST
 	EQUALS      // ==
 	LESSGREATER // < or >
-	SUM         // +
-	PRODUCT     // *
+	SUM         // + or -
+	PRODUCT     // * or /
 	PREFIX      // -X or +X
 	CALL        //  myFunction(X)
 )
@@ -25,12 +25,40 @@ type (
 	infixParseFn  func(ast.Expression) ast.Expression
 )
 
+/* 优先级表：为二元计算符号定义优先级 */
+var precedences = map[token.TokenType]int{
+	token.EQ:       EQUALS,
+	token.NOT_EQ:   EQUALS,
+	token.LT:       LESSGREATER,
+	token.RT:       LESSGREATER,
+	token.PLUS:     SUM,
+	token.MINUS:    SUM,
+	token.SLASH:    PRODUCT,
+	token.ASTERISK: PRODUCT,
+}
+
+/* 获取peekToken的优先级 */
+func (p *Parser) peekPrecedence() int {
+	if p, ok := precedences[p.peekToken.Type]; ok {
+		return p
+	}
+	return LOWEST
+}
+
+/* 获取curToken的运算优先级 */
+func (p *Parser) curPrecdence() int {
+	if c, ok := precedences[p.curToken.Type]; ok {
+		return c
+	}
+	return LOWEST
+}
+
 /*
 	Define Parser structure and methods
 */
 type Parser struct {
 	l         *lexer.Lexer
-	errors    []string
+	errors    []string // 收集错误信息，方便debug
 	curToken  token.Token
 	peekToken token.Token
 
@@ -40,11 +68,24 @@ type Parser struct {
 
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l, errors: []string{}}
+	/* 注册前缀计算符号的优先级 */
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	/* 注册中缀计算符号的优先级 */
+
+	p.infixParseFns = make(map[token.TokenType]infixParseFn)
+	p.registerInfix(token.PLUS, p.parseInfixExpression)
+	p.registerInfix(token.MINUS, p.parseInfixExpression)
+	p.registerInfix(token.SLASH, p.parseInfixExpression)
+	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(token.EQ, p.parseInfixExpression)
+	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
+	p.registerInfix(token.LT, p.parseInfixExpression)
+	p.registerInfix(token.RT, p.parseInfixExpression)
+
 	// Set curToken and peekToken both
 	p.nextToken()
 	p.nextToken()
@@ -62,11 +103,13 @@ func (p *Parser) peekError(t token.TokenType) {
 	p.errors = append(p.errors, msg)
 }
 
+/* 读取下一个token */
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
 }
 
+/* 解析程序 */
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
@@ -157,11 +200,12 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	return stmt
 }
 
+/* 判断下一个token是否为 ttype */
 func (p *Parser) peekTokenIs(ttype token.TokenType) bool {
 	return p.peekToken.Type == ttype
 }
 
-/* 调用运算符对应的运算方法 */
+/* 调用运算符对应的运算方法,解析Expression */
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefix := p.prefixParseFns[p.curToken.Type]
 	if prefix == nil {
@@ -169,7 +213,17 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 		return nil
 	}
 	leftExp := prefix()
-
+	// 处理中缀表达式
+	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+		// 读取下一个token
+		p.nextToken()
+		// 需要以左侧Expression作为参数
+		leftExp = infix(leftExp)
+	}
 	return leftExp
 }
 
@@ -206,7 +260,7 @@ func (p *Parser) noPrefixParseFnError(t token.TokenType) {
 	p.errors = append(p.errors, msg)
 }
 
-/* build new prefix node */
+/* 解析前缀表达式，建立前缀表达式节点 */
 func (p *Parser) parsePrefixExpression() ast.Expression {
 	expression := &ast.PrefixExpression{
 		Token:    p.curToken,
@@ -215,6 +269,21 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 	p.nextToken() // advance a token, deal with some example: -5
 	// 按照PREFIX的优先级进行解析
 	expression.Right = p.parseExpression(PREFIX)
+
+	return expression
+}
+
+/* 传入左侧表达式参数，建立中缀表达式节点 */
+func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
+	expression := &ast.InfixExpression{
+		Token:    p.curToken,
+		Left:     left,
+		Operator: p.curToken.Literal,
+	}
+
+	precedence := p.curPrecdence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
 
 	return expression
 }
