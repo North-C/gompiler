@@ -3,13 +3,14 @@ package ast
 import (
 	"bytes"
 	"gompiler/token"
+	"strings"
 )
 
 /* define the structures and interface for AST */
 
 type Node interface {
 	TokenLiteral() string
-	String() string 			// 打印Node，利于调试
+	String() string // 打印Node，利于调试
 }
 
 /* Difference between `Statement` and `Expression` is whether producing value */
@@ -36,10 +37,10 @@ func (p *Program) TokenLiteral() string {
 	}
 }
 
-func (p *Program) String() string{
+func (p *Program) String() string {
 	var out bytes.Buffer
 
-	for _, s := range p.Statements{
+	for _, s := range p.Statements {
 		out.WriteString(s.String())
 	}
 
@@ -57,14 +58,14 @@ func (ls *LetStatement) TokenLiteral() string {
 	return ls.Token.Literal
 }
 
-func (ls *LetStatement) String() string{
+func (ls *LetStatement) String() string {
 	var out bytes.Buffer
 
 	out.WriteString(ls.TokenLiteral() + " ")
 	out.WriteString(ls.Name.String())
 	out.WriteString(" = ")
 
-	if ls.Value != nil{
+	if ls.Value != nil {
 		out.WriteString(ls.Value.String())
 	}
 	out.WriteString(";")
@@ -80,11 +81,11 @@ func (rs *ReturnStatement) statementNode() {}
 func (rs *ReturnStatement) TokenLiteral() string {
 	return rs.Token.Literal
 }
-func (rs *ReturnStatement) String() string{
+func (rs *ReturnStatement) String() string {
 	var out bytes.Buffer
 
 	out.WriteString(rs.TokenLiteral() + " ")
-	if rs.ReturnValue != nil{
+	if rs.ReturnValue != nil {
 		out.WriteString(rs.ReturnValue.String())
 	}
 	out.WriteString(";")
@@ -100,7 +101,7 @@ func (i *Identifier) expressionNode() {}
 func (i *Identifier) TokenLiteral() string {
 	return i.Token.Literal
 }
-func (i *Identifier)String() string{
+func (i *Identifier) String() string {
 	return i.Value
 }
 
@@ -113,9 +114,171 @@ func (es *ExpressionStatement) statementNode() {}
 func (es *ExpressionStatement) TokenLiteral() string {
 	return es.Token.Literal
 }
-func (es *ExpressionStatement) String() string{
-	if es.Expression == nil{
+func (es *ExpressionStatement) String() string {
+	if es.Expression == nil {
 		return ""
 	}
 	return es.Expression.String()
+}
+
+type IntegerLiteral struct {
+	Token token.Token
+	Value int64
+}
+
+// fulfill s the Expression interface
+func (il *IntegerLiteral) expressionNode()      {}
+func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
+func (il *IntegerLiteral) String() string       { return il.Token.Literal }
+
+/* 前缀表达式 */
+type PrefixExpression struct {
+	Token    token.Token // prefix token
+	Operator string
+	Right    Expression
+}
+
+func (pe *PrefixExpression) expressionNode()      {}
+func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *PrefixExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(pe.Operator)
+	out.WriteString(pe.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
+
+/* 中缀表达式 */
+type InfixExpression struct {
+	Token    token.Token
+	Left     Expression
+	Operator string
+	Right    Expression
+}
+
+func (ie *InfixExpression) expressionNode()      {}
+func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *InfixExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(ie.Left.String() + " ")
+	out.WriteString(ie.Operator + " ")
+	out.WriteString(ie.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
+
+type Boolean struct {
+	Token token.Token
+	Value bool
+}
+
+func (b *Boolean) expressionNode()      {}
+func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
+func (b *Boolean) String() string       { return b.Token.Literal }
+
+// if (<condition>) <consequence> else <alternative>
+type IfExpression struct {
+	Token       token.Token
+	Condition   Expression      // 条件语句
+	Consequence *BlockStatement // if的内部语句块
+	Alternative *BlockStatement // else部分的语句块
+}
+
+func (ife *IfExpression) expressionNode()      {}
+func (ife *IfExpression) TokenLiteral() string { return ife.Token.Literal }
+func (ife *IfExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("if")
+	out.WriteString(ife.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(ife.Consequence.String())
+
+	if ife.Alternative != nil {
+		out.WriteString("else")
+		out.WriteString(ife.Alternative.String())
+	}
+	return out.String()
+}
+
+// 内部语句块
+type BlockStatement struct {
+	Token      token.Token // token: '{'
+	Statements []Statement
+}
+
+func (bs *BlockStatement) expressionNode()      {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var out bytes.Buffer
+
+	for _, s := range bs.Statements {
+		out.WriteString(s.String())
+	}
+
+	return out.String()
+}
+
+// fn <Parameters> { Body }
+type FunctionLiteral struct {
+	Token      token.Token // token: `fn``
+	Parameters []*Identifier
+	Body       *BlockStatement
+}
+
+func (fl *FunctionLiteral) expressionNode()      {}
+func (fl *FunctionLiteral) TokenLiteral() string { return fl.Token.Literal }
+func (fl *FunctionLiteral) String() string {
+	var out bytes.Buffer
+
+	params := []string{}
+
+	for _, p := range fl.Parameters {
+		params = append(params, p.String())
+	}
+
+	out.WriteString(fl.TokenLiteral())
+	out.WriteString("(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") ")
+	out.WriteString(fl.Body.String())
+
+	return out.String()
+}
+
+// <expression>(<comma separated expression>)
+/*
+* Examples:
+* 	callsFunction(2, 3, fn(x, y){ x + y;})
+*   add(2, 3)
+ */
+type CallExpression struct {
+	Token     token.Token // token: `(`
+	Function  Expression  // Identifier or FunctionLiteral
+	Arguments []Expression
+}
+
+func (ce *CallExpression) expressionNode()      {}
+func (ce *CallExpression) TokenLiteral() string { return ce.Token.Literal }
+func (ce *CallExpression) String() string {
+	var out bytes.Buffer
+
+	args := []string{}
+
+	for _, p := range ce.Arguments {
+		args = append(args, p.String())
+	}
+
+	out.WriteString(ce.Function.String())
+	out.WriteString("(")
+	out.WriteString(strings.Join(args, ", "))
+	out.WriteString(")")
+
+	return out.String()
 }
