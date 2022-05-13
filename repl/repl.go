@@ -3,9 +3,12 @@ package repl
 import (
 	"bufio"
 	"fmt"
+	"gompiler/evaluator"
 	"gompiler/lexer"
+	"gompiler/object"
 	"gompiler/parser"
-	"gompiler/token"
+
+	// "gompiler/token"
 	"io"
 )
 
@@ -15,6 +18,7 @@ const PROMPT = ">> "
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+	env := object.NewEnvironment()
 
 	for {
 		fmt.Print(PROMPT)
@@ -33,15 +37,21 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		io.WriteString(out, program.String())
-		io.WriteString(out, "\n")
-
-		for tok := l.NextToken(); tok.Type != token.EOF; tok = l.NextToken() {
-			if tok.Literal == "q" || tok.Literal == "Q" {
-				return
-			}
-			fmt.Printf("%+v\n", tok)
+		evaluated := evaluator.Eval(program, env)
+		if evaluated != nil {
+			io.WriteString(out, evaluated.Inspect())
+			io.WriteString(out, "\n")
 		}
+
+		// io.WriteString(out, program.String())
+		// io.WriteString(out, "\n")
+
+		// for tok := l.NextToken(); tok.Type != token.EOF; tok = l.NextToken() {
+		// 	if tok.Literal == "q" || tok.Literal == "Q" {
+		// 		return
+		// 	}
+		// 	fmt.Printf("%+v\n", tok)
+		// }
 	}
 }
 
