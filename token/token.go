@@ -47,6 +47,7 @@ const (
 	RBRACE = "}"
 	LBRACKET = "["
 	RBRACKET = "]"
+	COLON = ":"			// lex hash
 
 	// Keywords
 	FUNCTION = "FUNCTION"
