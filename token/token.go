@@ -1,7 +1,7 @@
 package token
 
-/* 
-	define the Token and constants 
+/*
+	define the Token and constants
 */
 
 type TokenType string
@@ -18,6 +18,7 @@ const (
 	// Idetifiers and literals
 	IDENT = "IDENT"
 	INT = "INT" 	
+	STRING = "STRING"
 	
 	// Operators
 	ASSIGN = "="

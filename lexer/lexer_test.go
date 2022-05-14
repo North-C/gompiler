@@ -1,8 +1,8 @@
 package lexer
 
 import (
-	"testing"
 	"gompiler/token"
+	"testing"
 )
 
 /* Test lexer */
@@ -26,6 +26,8 @@ func TestNextToken(t *testing.T){
 
 		10 == 10;
 		10 != 5;
+		"foobar"
+		"foo bar"
 		`
 	
 	test := []struct{
@@ -105,7 +107,9 @@ func TestNextToken(t *testing.T){
 		{token.NOT_EQ,"!="},
 		{token.INT,"5"},
 		{token.SEMICOLON,";"},
-		{token.EOF,""},
+		{token.STRING, "foobar"},
+		{token.STRING, "foo bar"},
+		{token.EOF, ""},
 	}
 
 	l := New(input)
@@ -124,4 +128,3 @@ func TestNextToken(t *testing.T){
 		}
 	}
 }
-
