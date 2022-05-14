@@ -81,6 +81,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
 	p.registerPrefix(token.STRING, p.parseStringLiteral)
+	p.registerPrefix(token.LBRACKET, p.parseArrayLiteral)
 
 	/* 注册中缀计算符号的优先级 */
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
@@ -418,7 +419,7 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
 	call := &ast.CallExpression{Token: p.curToken, Function: function}
 
-	call.Arguments = p.parserCallArguments()
+	call.Arguments = p.parseExpressionList(token.RPAREN)
 
 	return call
 }
@@ -448,4 +449,37 @@ func (p *Parser) parserCallArguments() []ast.Expression {
 
 func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseArrayLiteral() ast.Expression {
+	array := &ast.ArrayLiteral{Token: p.curToken}
+
+	array.Elements = p.parseExpressionList(token.RBRACKET)
+
+	return array
+}
+
+func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
+	list := []ast.Expression{}
+
+	if p.peekTokenIs(end) {
+		p.nextToken()
+		return list
+	}
+
+	p.nextToken()
+	list = append(list, p.parseExpression(LOWEST))
+
+	for p.peekTokenIs(token.COMMA) {
+		p.nextToken()
+		p.nextToken()
+		list = append(list, p.parseExpression(LOWEST))
+	}
+
+	// next token is not `end`, that's error
+	if !p.expectPeek(end) {
+		return nil
+	}
+
+	return list
 }
