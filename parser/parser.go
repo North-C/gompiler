@@ -18,6 +18,7 @@ const (
 	PRODUCT     // * or /
 	PREFIX      // -X or +X
 	CALL        //  myFunction(X)
+	INDEX       // array[index]
 )
 
 type (
@@ -36,6 +37,7 @@ var precedences = map[token.TokenType]int{
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
 	token.LPAREN:   CALL, // call --- (
+	token.LBRACKET: INDEX,
 }
 
 /* 获取peekToken的优先级 */
@@ -93,8 +95,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.LT, p.parseInfixExpression)
 	p.registerInfix(token.RT, p.parseInfixExpression)
-	p.registerInfix(token.LPAREN, p.parseCallExpression) // ( --- callExpression
-
+	p.registerInfix(token.LPAREN, p.parseCallExpression)    // ( --- callExpression
+	p.registerInfix(token.LBRACKET, p.parseIndexExpression) // index operator for array <>[]
 	// Set curToken and peekToken both
 	p.nextToken()
 	p.nextToken()
@@ -482,4 +484,23 @@ func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	}
 
 	return list
+}
+
+func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
+	exp := &ast.IndexExpression{Token: p.curToken, Left: left}
+
+	p.nextToken()
+
+	// if p.curTokenIs(token.RBRACKET) {
+	// 	p.nextToken()
+	// 	return nil
+	// }
+
+	exp.Index = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.RBRACKET) {
+		return nil
+	}
+
+	return exp
 }
